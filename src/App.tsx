@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Page, Coupon, Stats } from './types';
+import { api } from './services/api';
 
 // --- Components ---
 
@@ -252,6 +253,24 @@ const LandingPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
 };
 
 const LoginPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      await api.login(email);
+      onNavigate('dashboard');
+    } catch (err: any) {
+      setError('Usuário não encontrado. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen">
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-primary/10">
@@ -277,8 +296,17 @@ const LoginPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
             <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Acesse sua conta</h1>
             <p className="text-slate-500 dark:text-slate-400">Entre para gerenciar suas campanhas de cupons.</p>
           </div>
-          <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); onNavigate('dashboard'); }}>
-            <Input label="E-mail" icon={Mail} placeholder="seu@email.com" type="email" required />
+          <form className="space-y-6" onSubmit={handleLogin}>
+            {error && <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg border border-red-100">{error}</div>}
+            <Input 
+              label="E-mail" 
+              icon={Mail} 
+              placeholder="seu@email.com" 
+              type="email" 
+              required 
+              value={email}
+              onChange={(e: any) => setEmail(e.target.value)}
+            />
             <div className="space-y-1">
               <div className="flex justify-between items-center">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Senha</label>
@@ -290,7 +318,9 @@ const LoginPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
               <input type="checkbox" id="remember" className="h-4 w-4 text-primary focus:ring-primary border-slate-300 rounded cursor-pointer" />
               <label htmlFor="remember" className="ml-2 block text-sm text-slate-600 dark:text-slate-400 cursor-pointer">Manter conectado</label>
             </div>
-            <Button type="submit" className="w-full py-4">Entrar na plataforma</Button>
+            <Button type="submit" className="w-full py-4" disabled={loading}>
+              {loading ? 'Entrando...' : 'Entrar na plataforma'}
+            </Button>
           </form>
           <div className="pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
             <p className="text-slate-600 dark:text-slate-400 text-sm">Ainda não tem uma conta? <button onClick={() => onNavigate('register')} className="font-bold text-primary hover:text-primary/80 ml-1">Criar conta grátis</button></p>
@@ -302,6 +332,27 @@ const LoginPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
 };
 
 const RegisterPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
+  const [formData, setFormData] = useState({
+    email: '',
+    company_name: '',
+    responsible_name: '',
+    phone: ''
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.register(formData);
+      onNavigate('dashboard');
+    } catch (err) {
+      alert('Erro ao criar conta.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-4 lg:px-20">
@@ -332,16 +383,47 @@ const RegisterPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
                 <div className="bg-primary h-full w-1/3"></div>
               </div>
             </div>
-            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); onNavigate('dashboard'); }}>
+            <form className="space-y-6" onSubmit={handleRegister}>
               <div className="space-y-4">
-                <Input label="Nome da Empresa" icon={Store} placeholder="Ex: Padaria Central" required />
-                <Input label="Pessoa Responsável" icon={Users} placeholder="Nome completo" required />
+                <Input 
+                  label="Nome da Empresa" 
+                  icon={Store} 
+                  placeholder="Ex: Padaria Central" 
+                  required 
+                  value={formData.company_name}
+                  onChange={(e: any) => setFormData({ ...formData, company_name: e.target.value })}
+                />
+                <Input 
+                  label="Pessoa Responsável" 
+                  icon={Users} 
+                  placeholder="Nome completo" 
+                  required 
+                  value={formData.responsible_name}
+                  onChange={(e: any) => setFormData({ ...formData, responsible_name: e.target.value })}
+                />
               </div>
               <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <Input label="E-mail Corporativo" icon={Mail} placeholder="contato@empresa.com.br" type="email" required />
-                <Input label="Senha" icon={Lock} placeholder="Mínimo 8 caracteres" type="password" required />
+                <Input 
+                  label="E-mail Corporativo" 
+                  icon={Mail} 
+                  placeholder="contato@empresa.com.br" 
+                  type="email" 
+                  required 
+                  value={formData.email}
+                  onChange={(e: any) => setFormData({ ...formData, email: e.target.value })}
+                />
+                <Input 
+                  label="Telefone" 
+                  icon={Smartphone} 
+                  placeholder="(11) 99999-9999" 
+                  required 
+                  value={formData.phone}
+                  onChange={(e: any) => setFormData({ ...formData, phone: e.target.value })}
+                />
               </div>
-              <Button type="submit" className="w-full py-4">Criar Minha Conta</Button>
+              <Button type="submit" className="w-full py-4" disabled={loading}>
+                {loading ? 'Criando...' : 'Criar Minha Conta'}
+              </Button>
             </form>
           </Card>
         </div>
@@ -412,10 +494,12 @@ const DashboardLayout = ({ children, activePage, onNavigate }: any) => {
 };
 
 const DashboardOverview = ({ onNavigate }: any) => {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<any>(null);
+  const [sub, setSub] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/stats').then(r => r.json()).then(setStats);
+    api.getStats().then(setStats);
+    api.getMySubscription().then(setSub);
   }, []);
 
   return (
@@ -440,7 +524,7 @@ const DashboardOverview = ({ onNavigate }: any) => {
           { label: 'Total de Cupons', value: stats?.totalCoupons || 0, icon: Ticket, trend: '+12%', color: 'blue' },
           { label: 'Cliques Totais', value: stats?.totalClicks || 0, icon: Smartphone, trend: '+25%', color: 'purple' },
           { label: 'Cupons Ativos', value: stats?.activeCoupons || 0, icon: CheckCircle2, trend: '+2%', color: 'emerald' },
-          { label: 'Plano Atual', value: stats?.plan || '...', icon: Sparkles, trend: 'Renovação em 14d', color: 'amber' },
+          { label: 'Plano Atual', value: sub?.plan_name || '...', icon: Sparkles, trend: sub ? `Limite: ${sub.max_coupons}` : '...', color: 'amber' },
         ].map(kpi => (
           <Card key={kpi.label} className="p-6">
             <div className="flex justify-between items-start mb-4">
@@ -459,7 +543,7 @@ const DashboardOverview = ({ onNavigate }: any) => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-xl font-bold">Engajamento de Cliques</h3>
-            <p className="text-sm text-slate-500">Análise de desempenho nos últimos 30 dias</p>
+            <p className="text-sm text-slate-500">Análise de desempenho nos últimos 7 dias</p>
           </div>
           <div className="flex gap-2">
             <button className="px-3 py-1.5 text-xs font-bold rounded bg-slate-100 dark:bg-slate-700">7 Dias</button>
@@ -467,24 +551,30 @@ const DashboardOverview = ({ onNavigate }: any) => {
           </div>
         </div>
         <div className="h-64 flex items-end justify-between gap-2 pt-4">
-          {[40, 70, 45, 90, 65, 80, 50, 60, 75, 95, 60, 85].map((h, i) => (
-            <div key={i} className="flex-1 bg-primary/10 rounded-t-lg relative group">
-              <motion.div 
-                initial={{ height: 0 }}
-                animate={{ height: `${h}%` }}
-                className="absolute bottom-0 left-0 right-0 bg-primary rounded-t-lg group-hover:bg-blue-600 transition-colors"
-              ></motion.div>
-            </div>
-          ))}
+          {stats?.clickHistory?.length > 0 ? (
+            stats.clickHistory.map((item: any, i: number) => (
+              <div key={i} className="flex-1 bg-primary/10 rounded-t-lg relative group">
+                <motion.div 
+                  initial={{ height: 0 }}
+                  animate={{ height: `${(item.count / Math.max(...stats.clickHistory.map((h: any) => h.count))) * 100}%` }}
+                  className="absolute bottom-0 left-0 right-0 bg-primary rounded-t-lg group-hover:bg-blue-600 transition-colors"
+                ></motion.div>
+              </div>
+            ))
+          ) : (
+            [40, 70, 45, 90, 65, 80, 50].map((h, i) => (
+              <div key={i} className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-t-lg"></div>
+            ))
+          )}
         </div>
         <div className="flex justify-between mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          <span>01 Jan</span>
-          <span>05 Jan</span>
-          <span>10 Jan</span>
-          <span>15 Jan</span>
-          <span>20 Jan</span>
-          <span>25 Jan</span>
-          <span>30 Jan</span>
+          {stats?.clickHistory?.length > 0 ? (
+            stats.clickHistory.map((item: any, i: number) => (
+              <span key={i}>{item.day.split('-').slice(2)}</span>
+            ))
+          ) : (
+            <span>Sem dados</span>
+          )}
         </div>
       </Card>
 
@@ -530,15 +620,23 @@ const DashboardOverview = ({ onNavigate }: any) => {
 };
 
 const CouponsPage = ({ onNavigate }: any) => {
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/coupons').then(r => r.json()).then(setCoupons);
+    api.getMyCoupons().then(setCoupons);
   }, []);
 
   const deleteCoupon = (id: number) => {
-    fetch(`/api/coupons/${id}`, { method: 'DELETE' }).then(() => {
-      setCoupons(prev => prev.filter(c => c.id !== id));
+    if (confirm('Tem certeza que deseja excluir este cupom?')) {
+      api.deleteCoupon(id).then(() => {
+        setCoupons(prev => prev.filter(c => c.id !== id));
+      });
+    }
+  };
+
+  const simulateClick = (id: number) => {
+    api.trackClick(id).then(() => {
+      setCoupons(prev => prev.map(c => c.id === id ? { ...c, clicks_count: c.clicks_count + 1 } : c));
     });
   };
 
@@ -568,6 +666,7 @@ const CouponsPage = ({ onNavigate }: any) => {
                 <th className="px-6 py-4">Nome</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Cliques</th>
+                <th className="px-6 py-4">Destaque</th>
                 <th className="px-6 py-4">Expiração</th>
                 <th className="px-6 py-4 text-right">Ações</th>
               </tr>
@@ -575,7 +674,7 @@ const CouponsPage = ({ onNavigate }: any) => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {coupons.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">Nenhum cupom encontrado.</td>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">Nenhum cupom encontrado.</td>
                 </tr>
               ) : coupons.map(coupon => (
                 <tr key={coupon.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors group">
@@ -592,10 +691,20 @@ const CouponsPage = ({ onNavigate }: any) => {
                       <span className={`size-1.5 rounded-full ${coupon.status === 'active' ? 'bg-emerald-500' : 'bg-slate-500'}`}></span> {coupon.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm">{coupon.clicks}</td>
-                  <td className="px-6 py-4 text-sm">{coupon.expiry_date}</td>
+                  <td className="px-6 py-4 text-sm">{coupon.clicks_count}</td>
+                  <td className="px-6 py-4">
+                    {coupon.is_highlighted ? (
+                      <span className="text-amber-500 flex items-center gap-1 text-xs font-bold">
+                        <Sparkles size={14} /> Sim
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 text-xs">Não</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm">{new Date(coupon.expiration_date).toLocaleDateString()}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => simulateClick(coupon.id)} className="px-2 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 rounded hover:bg-primary hover:text-white transition-colors">Simular Clique</button>
                       <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-primary"><Edit2 size={16} /></button>
                       <button onClick={() => deleteCoupon(coupon.id)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
                     </div>
@@ -613,19 +722,25 @@ const CouponsPage = ({ onNavigate }: any) => {
 const CreateCouponPage = ({ onNavigate }: any) => {
   const [formData, setFormData] = useState({
     title: '',
-    category: '',
+    category_id: '',
     description: '',
-    code: '',
-    expiry_date: ''
+    coupon_code: '',
+    expiration_date: '',
+    is_highlighted: false
   });
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    fetch('/api/coupons', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    }).then(() => onNavigate('coupons'));
+    setLoading(true);
+    try {
+      await api.createCoupon(formData);
+      onNavigate('coupons');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -652,14 +767,15 @@ const CreateCouponPage = ({ onNavigate }: any) => {
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Categoria</label>
               <select 
                 className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                value={formData.category}
-                onChange={(e: any) => setFormData({ ...formData, category: e.target.value })}
+                value={formData.category_id}
+                onChange={(e: any) => setFormData({ ...formData, category_id: e.target.value })}
                 required
               >
                 <option value="">Selecione uma categoria</option>
-                <option value="food">Alimentação</option>
-                <option value="retail">Varejo</option>
+                <option value="food">Alimentação & Bebidas</option>
+                <option value="retail">Varejo & Moda</option>
                 <option value="services">Serviços</option>
+                <option value="beauty">Beleza & Estética</option>
               </select>
             </div>
             <div className="col-span-2 space-y-1.5">
@@ -682,17 +798,28 @@ const CreateCouponPage = ({ onNavigate }: any) => {
             <Input 
               label="Código do Cupom" 
               placeholder="PIZZA50OFF" 
-              value={formData.code}
-              onChange={(e: any) => setFormData({ ...formData, code: e.target.value })}
+              value={formData.coupon_code}
+              onChange={(e: any) => setFormData({ ...formData, coupon_code: e.target.value })}
               required 
             />
             <Input 
               label="Data de Expiração" 
               type="date" 
-              value={formData.expiry_date}
-              onChange={(e: any) => setFormData({ ...formData, expiry_date: e.target.value })}
+              value={formData.expiration_date}
+              onChange={(e: any) => setFormData({ ...formData, expiration_date: e.target.value })}
               required 
             />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              id="highlight" 
+              className="size-4 text-primary rounded"
+              checked={formData.is_highlighted}
+              onChange={(e) => setFormData({ ...formData, is_highlighted: e.target.checked })}
+            />
+            <label htmlFor="highlight" className="text-sm font-semibold">Destacar este cupom (Requer plano Pro/Premium)</label>
           </div>
 
           <div className="space-y-4">
@@ -708,8 +835,8 @@ const CreateCouponPage = ({ onNavigate }: any) => {
 
           <div className="flex items-center justify-end gap-4 pt-6">
             <Button variant="ghost" type="button" onClick={() => onNavigate('coupons')}>Cancelar</Button>
-            <Button type="submit" variant="success" className="px-10">
-              <Send size={18} /> Publicar Cupom
+            <Button type="submit" variant="success" className="px-10" disabled={loading}>
+              <Send size={18} /> {loading ? 'Publicando...' : 'Publicar Cupom'}
             </Button>
           </div>
         </form>
@@ -719,6 +846,14 @@ const CreateCouponPage = ({ onNavigate }: any) => {
 };
 
 const BillingPage = () => {
+  const [sub, setSub] = useState<any>(null);
+  const [plans, setPlans] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.getMySubscription().then(setSub);
+    api.getPlans().then(setPlans);
+  }, []);
+
   return (
     <div className="space-y-8">
       <div>
@@ -734,17 +869,18 @@ const BillingPage = () => {
                 <Sparkles size={32} />
               </div>
               <div>
-                <h3 className="text-xl font-bold">Plano Pro Business</h3>
-                <p className="text-sm text-slate-500">Sua assinatura renova em 15 de Abril, 2024</p>
+                <h3 className="text-xl font-bold">Plano {sub?.plan_name || '...'}</h3>
+                <p className="text-sm text-slate-500">Sua assinatura está ativa</p>
               </div>
             </div>
-            <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full uppercase tracking-wider">Ativo</span>
+            <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full uppercase tracking-wider">{sub?.status || '...'}</span>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 py-8 border-y border-slate-100 dark:border-slate-800">
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Valor Mensal</p>
-              <p className="text-3xl font-black">R$ 89,90<span className="text-sm font-medium text-slate-500">/mês</span></p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Limites do Plano</p>
+              <p className="text-lg font-bold">{sub?.max_coupons} Cupons</p>
+              <p className="text-sm text-slate-500">{sub?.max_highlighted_coupons} Destaques permitidos</p>
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Método de Pagamento</p>
@@ -753,8 +889,8 @@ const BillingPage = () => {
                   <CreditCard size={20} className="text-slate-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold">•••• •••• •••• 4242</p>
-                  <p className="text-xs text-slate-500">Expira em 12/28</p>
+                  <p className="text-sm font-bold">Cartão de Crédito</p>
+                  <p className="text-xs text-slate-500">Configurado via Stripe</p>
                 </div>
               </div>
             </div>
@@ -767,25 +903,17 @@ const BillingPage = () => {
         </Card>
 
         <Card className="p-6 bg-primary text-white border-none shadow-xl shadow-primary/20">
-          <h3 className="text-lg font-bold mb-4">Por que o Plano Pro?</h3>
-          <ul className="space-y-4">
-            {[
-              'Cupons ilimitados',
-              'Estatísticas avançadas',
-              'Suporte prioritário 24/7',
-              'Remoção da marca Cidade Cupons',
-              'Integração com WhatsApp Business'
-            ].map(feature => (
-              <li key={feature} className="flex items-start gap-3 text-sm font-medium">
-                <CheckCircle2 size={18} className="shrink-0 text-white/80" />
-                {feature}
-              </li>
+          <h3 className="text-lg font-bold mb-4">Planos Disponíveis</h3>
+          <div className="space-y-4">
+            {plans.map(p => (
+              <div key={p.id} className="p-3 bg-white/10 rounded-lg border border-white/20">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold">{p.name}</span>
+                  <span className="text-xs font-bold">R$ {p.price_monthly}/mês</span>
+                </div>
+                <p className="text-[10px] opacity-80">Até {p.max_coupons} cupons</p>
+              </div>
             ))}
-          </ul>
-          <div className="mt-8 p-4 bg-white/10 rounded-xl border border-white/20">
-            <p className="text-xs font-bold uppercase tracking-widest mb-1 opacity-80">Economia Anual</p>
-            <p className="text-xl font-bold">Poupe R$ 240,00</p>
-            <p className="text-xs opacity-70 mt-1">Ao mudar para o faturamento anual.</p>
           </div>
         </Card>
       </div>
@@ -829,6 +957,170 @@ const BillingPage = () => {
   );
 };
 
+const StatsPage = () => {
+  const [stats, setStats] = useState<any>(null);
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  useEffect(() => {
+    api.getStats().then(setStats);
+  }, []);
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Estatísticas Detalhadas</h2>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Analise o desempenho de suas campanhas em tempo real.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+          <input 
+            type="date" 
+            className="bg-transparent border-none text-xs font-bold focus:ring-0" 
+            value={dateRange.start}
+            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+          />
+          <span className="text-slate-400 text-xs">até</span>
+          <input 
+            type="date" 
+            className="bg-transparent border-none text-xs font-bold focus:ring-0" 
+            value={dateRange.end}
+            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+          />
+          <Button variant="secondary" className="py-1 px-3 text-xs">Filtrar</Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="p-6">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Taxa de Conversão</p>
+          <p className="text-3xl font-black">3.2%</p>
+          <div className="mt-4 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div className="bg-primary h-full w-[3.2%]"></div>
+          </div>
+        </Card>
+        <Card className="p-6">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Melhor Horário</p>
+          <p className="text-3xl font-black">18:00 - 20:00</p>
+          <p className="text-xs text-emerald-500 font-bold mt-2 flex items-center gap-1">
+            <TrendingUp size={14} /> +15% de engajamento
+          </p>
+        </Card>
+        <Card className="p-6">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Categoria Top</p>
+          <p className="text-3xl font-black">Alimentação</p>
+          <p className="text-xs text-slate-500 mt-2">65% do total de cliques</p>
+        </Card>
+      </div>
+
+      <Card className="p-8">
+        <h3 className="text-xl font-bold mb-6">Cliques por Dia</h3>
+        <div className="h-80 flex items-end justify-between gap-4">
+          {stats?.clickHistory?.length > 0 ? (
+            stats.clickHistory.map((item: any, i: number) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                <div className="w-full bg-primary/10 rounded-t-lg relative group">
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    animate={{ height: `${(item.count / Math.max(...stats.clickHistory.map((h: any) => h.count))) * 100}%` }}
+                    className="absolute bottom-0 left-0 right-0 bg-primary rounded-t-lg group-hover:bg-blue-600 transition-colors"
+                  >
+                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      {item.count} cliques
+                    </div>
+                  </motion.div>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase rotate-45 mt-4">{item.day.split('-').slice(1).join('/')}</span>
+              </div>
+            ))
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 italic">
+              Aguardando dados de cliques...
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+const SettingsPage = () => {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    // In a real app, we'd fetch the full user profile
+    const email = localStorage.getItem('cidade_cupons_user_email') || 'contato@empresa.com';
+    setUser({ email, company_name: 'Minha Empresa', responsible_name: 'Responsável' });
+  }, []);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Configurações</h2>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">Gerencie seu perfil e preferências da conta.</p>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="p-8">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <Store size={20} className="text-primary" /> Perfil da Empresa
+            </h3>
+            <form className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <Input label="Nome Fantasia" defaultValue={user?.company_name} />
+                <Input label="CNPJ (Opcional)" placeholder="00.000.000/0000-00" />
+              </div>
+              <Input label="Endereço Comercial" placeholder="Rua, Número, Bairro, Cidade - UF" />
+              <div className="grid md:grid-cols-2 gap-4">
+                <Input label="Telefone de Contato" placeholder="(00) 00000-0000" />
+                <Input label="WhatsApp para Clientes" placeholder="(00) 00000-0000" />
+              </div>
+              <div className="pt-4">
+                <Button>Salvar Alterações</Button>
+              </div>
+            </form>
+          </Card>
+
+          <Card className="p-8">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <Lock size={20} className="text-primary" /> Segurança
+            </h3>
+            <form className="space-y-4">
+              <Input label="E-mail de Acesso" defaultValue={user?.email} disabled />
+              <div className="grid md:grid-cols-2 gap-4">
+                <Input label="Nova Senha" type="password" />
+                <Input label="Confirmar Nova Senha" type="password" />
+              </div>
+              <div className="pt-4">
+                <Button variant="secondary">Atualizar Senha</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card className="p-6">
+            <h3 className="font-bold mb-4">Logo da Empresa</h3>
+            <div className="flex flex-col items-center gap-4">
+              <div className="size-32 rounded-2xl bg-slate-100 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400 overflow-hidden">
+                <img src="https://picsum.photos/seed/logo/200/200" alt="Logo" className="w-full h-full object-cover opacity-50" />
+              </div>
+              <Button variant="outline" className="w-full">Alterar Logo</Button>
+              <p className="text-[10px] text-slate-500 text-center uppercase tracking-wider font-bold">Recomendado: 512x512px (PNG/JPG)</p>
+            </div>
+          </Card>
+
+          <Card className="p-6 border-red-100 dark:border-red-900/30 bg-red-50/30 dark:bg-red-900/10">
+            <h3 className="font-bold text-red-600 mb-2">Zona de Perigo</h3>
+            <p className="text-xs text-slate-500 mb-4">Ao excluir sua conta, todos os seus cupons e dados de analytics serão removidos permanentemente.</p>
+            <Button variant="ghost" className="w-full text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-900/50">Excluir Minha Conta</Button>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -854,9 +1146,19 @@ export default function App() {
           <CreateCouponPage onNavigate={setCurrentPage} />
         </DashboardLayout>
       );
+      case 'stats': return (
+        <DashboardLayout activePage="stats" onNavigate={setCurrentPage}>
+          <StatsPage />
+        </DashboardLayout>
+      );
       case 'billing': return (
         <DashboardLayout activePage="billing" onNavigate={setCurrentPage}>
           <BillingPage />
+        </DashboardLayout>
+      );
+      case 'settings': return (
+        <DashboardLayout activePage="settings" onNavigate={setCurrentPage}>
+          <SettingsPage />
         </DashboardLayout>
       );
       default: return (
