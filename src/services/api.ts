@@ -55,7 +55,7 @@ export const api = {
     return res.json();
   },
 
-  async deleteCoupon(id: number) {
+  async deleteCoupon(id: string) {
     const res = await fetch('/api/delete-coupon', {
       method: 'DELETE',
       headers: headers(),
@@ -74,7 +74,7 @@ export const api = {
     return res.json();
   },
 
-  async trackClick(couponId: number) {
+  async trackClick(couponId: string) {
     const res = await fetch('/api/track-click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

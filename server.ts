@@ -1,115 +1,17 @@
+import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database("database.db");
-
-// Initialize database with the requested SaaS architecture
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    company_name TEXT,
-    responsible_name TEXT,
-    email TEXT UNIQUE,
-    phone TEXT,
-    role TEXT DEFAULT 'company',
-    status TEXT DEFAULT 'active',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS plans (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    price_monthly REAL,
-    price_yearly REAL,
-    max_coupons INTEGER,
-    max_highlighted_coupons INTEGER,
-    has_stats BOOLEAN,
-    priority_support BOOLEAN,
-    is_active BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS subscriptions (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    plan_id TEXT,
-    status TEXT DEFAULT 'active',
-    billing_cycle TEXT,
-    start_date DATETIME,
-    end_date DATETIME,
-    payment_provider TEXT,
-    payment_id TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(plan_id) REFERENCES plans(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS categories (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    slug TEXT UNIQUE,
-    is_active BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS coupons (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT,
-    category_id TEXT,
-    title TEXT,
-    description TEXT,
-    coupon_code TEXT,
-    image_url TEXT,
-    expiration_date DATETIME,
-    is_highlighted BOOLEAN DEFAULT 0,
-    status TEXT DEFAULT 'active',
-    clicks_count INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(category_id) REFERENCES categories(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS clicks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    coupon_id INTEGER,
-    user_agent TEXT,
-    ip_address TEXT,
-    clicked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(coupon_id) REFERENCES coupons(id)
-  );
-`);
-
-// Seed initial data if empty
-const seedData = () => {
-  const planCount = db.prepare("SELECT COUNT(*) as count FROM plans").get() as any;
-  if (planCount.count === 0) {
-    const insertPlan = db.prepare(`
-      INSERT INTO plans (id, name, price_monthly, price_yearly, max_coupons, max_highlighted_coupons, has_stats, priority_support)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertPlan.run('free', 'Grátis', 0, 0, 5, 0, 0, 0);
-    insertPlan.run('pro', 'Pro', 97, 970, 100, 10, 1, 1);
-    insertPlan.run('premium', 'Premium', 297, 2970, 9999, 9999, 1, 1);
-  }
-
-  const catCount = db.prepare("SELECT COUNT(*) as count FROM categories").get() as any;
-  if (catCount.count === 0) {
-    const insertCat = db.prepare("INSERT INTO categories (id, name, slug) VALUES (?, ?, ?)");
-    insertCat.run('food', 'Alimentação & Bebidas', 'food');
-    insertCat.run('retail', 'Varejo & Moda', 'retail');
-    insertCat.run('services', 'Serviços', 'services');
-    insertCat.run('beauty', 'Beleza & Estética', 'beauty');
-  }
-};
-seedData();
+// Initialize Supabase client with service role key for administrative tasks
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function startServer() {
   const app = express();
@@ -118,158 +20,232 @@ async function startServer() {
   app.use(express.json());
 
   // --- Auth Endpoints ---
-  app.post("/api/register", (req, res) => {
+  app.post("/api/register", async (req, res) => {
     const { email, company_name, responsible_name, phone } = req.body;
-    const id = Math.random().toString(36).substring(7);
+    
     try {
-      db.prepare(`
-        INSERT INTO users (id, email, company_name, responsible_name, phone)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(id, email, company_name, responsible_name, phone);
+      // In a real Supabase setup, we'd use supabase.auth.signUp
+      // For this demo, we'll use the service role to create a user in auth.users
+      // and let the trigger handle the profile creation, OR just insert into profiles
+      // if we are bypassing real auth for simplicity.
       
-      // Auto-subscribe to free plan
-      db.prepare(`
-        INSERT INTO subscriptions (id, user_id, plan_id, billing_cycle, start_date, end_date)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(Math.random().toString(36).substring(7), id, 'free', 'monthly', new Date().toISOString(), '2099-12-31');
+      // Let's use the 'profiles' table directly for this implementation to match the existing UI
+      // but in a real app, you'd use Supabase Auth.
+      
+      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password: 'password123', // Default password for demo
+        email_confirm: true,
+        user_metadata: { company_name, responsible_name }
+      });
 
-      res.json({ id, email });
+      if (authError) throw authError;
+
+      // The trigger 'on_auth_user_created' in the SQL script handles profile and initial subscription.
+      // We just return the user info.
+      res.json({ id: authUser.user.id, email: authUser.user.email });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
     }
   });
 
-  app.post("/api/login", (req, res) => {
+  app.post("/api/login", async (req, res) => {
     const { email } = req.body;
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
-    if (user) res.json(user);
-    else res.status(404).json({ error: "User not found" });
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email) // Note: Profiles table needs email if we want to query by it
+        .single();
+
+      // If profiles doesn't have email, we query auth.users (admin)
+      if (error || !data) {
+        const { data: users, error: userError } = await supabase.auth.admin.listUsers();
+        const user = users.users.find(u => u.email === email);
+        if (user) return res.json({ id: user.id, email: user.email });
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json(data);
+    } catch (e: any) {
+      res.status(400).json({ error: e.message });
+    }
   });
 
   // --- Plans & Subscriptions ---
-  app.get("/api/plans", (req, res) => {
-    res.json(db.prepare("SELECT * FROM plans WHERE is_active = 1").all());
+  app.get("/api/plans", async (req, res) => {
+    const { data, error } = await supabase
+      .from('plans')
+      .select('*')
+      .eq('is_active', true);
+    
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
   });
 
-  app.get("/api/my-subscription", (req, res) => {
-    const userId = req.headers['user-id'];
-    const sub = db.prepare(`
-      SELECT s.*, p.name as plan_name, p.max_coupons, p.max_highlighted_coupons, p.has_stats
-      FROM subscriptions s
-      JOIN plans p ON s.plan_id = p.id
-      WHERE s.user_id = ? AND s.status = 'active'
-    `).get(userId);
-    res.json(sub || null);
+  app.get("/api/my-subscription", async (req, res) => {
+    const userId = req.headers['user-id'] as string;
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('*, plans(*)')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single();
+
+    if (error && error.code !== 'PGRST116') return res.status(400).json({ error: error.message });
+    
+    if (data) {
+      // Flatten the response to match frontend expectations
+      const sub = {
+        ...data,
+        plan_name: data.plans.name,
+        max_coupons: data.plans.max_coupons,
+        max_highlighted_coupons: data.plans.max_highlighted_coupons,
+        has_stats: data.plans.has_stats
+      };
+      res.json(sub);
+    } else {
+      res.json(null);
+    }
   });
 
   // --- Coupons ---
-  app.get("/api/my-coupons", (req, res) => {
-    const userId = req.headers['user-id'];
-    const coupons = db.prepare(`
-      SELECT c.*, cat.name as category_name
-      FROM coupons c
-      LEFT JOIN categories cat ON c.category_id = cat.id
-      WHERE c.user_id = ?
-      ORDER BY c.created_at DESC
-    `).all(userId);
-    res.json(coupons);
+  app.get("/api/my-coupons", async (req, res) => {
+    const userId = req.headers['user-id'] as string;
+    const { data, error } = await supabase
+      .from('coupons')
+      .select('*, categories(name)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    const formatted = data.map(c => ({
+      ...c,
+      category_name: c.categories?.name
+    }));
+    res.json(formatted);
   });
 
-  app.post("/api/create-coupon", (req, res) => {
+  app.post("/api/create-coupon", async (req, res) => {
     const userId = req.headers['user-id'] as string;
     const { title, description, category_id, coupon_code, expiration_date, is_highlighted } = req.body;
 
-    // Check limits
-    const sub = db.prepare(`
-      SELECT p.max_coupons, p.max_highlighted_coupons,
-             (SELECT COUNT(*) FROM coupons WHERE user_id = ?) as current_coupons,
-             (SELECT COUNT(*) FROM coupons WHERE user_id = ? AND is_highlighted = 1) as current_highlighted
-      FROM subscriptions s
-      JOIN plans p ON s.plan_id = p.id
-      WHERE s.user_id = ? AND s.status = 'active'
-    `).get(userId, userId, userId) as any;
+    // The Supabase trigger 'before_coupon_insert_update' handles the limit validation.
+    // We just try to insert and catch the error.
+    const { data, error } = await supabase
+      .from('coupons')
+      .insert([{
+        user_id: userId,
+        category_id,
+        title,
+        description,
+        coupon_code,
+        expiration_date,
+        is_highlighted
+      }])
+      .select()
+      .single();
 
-    if (!sub) return res.status(403).json({ error: "No active subscription" });
-    if (sub.current_coupons >= sub.max_coupons) return res.status(403).json({ error: "Coupon limit reached" });
-    if (is_highlighted && sub.current_highlighted >= sub.max_highlighted_coupons) {
-      return res.status(403).json({ error: "Highlighted coupon limit reached" });
-    }
-
-    const info = db.prepare(`
-      INSERT INTO coupons (user_id, category_id, title, description, coupon_code, expiration_date, is_highlighted)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(userId, category_id, title, description, coupon_code, expiration_date, is_highlighted ? 1 : 0);
-
-    res.json({ id: info.lastInsertRowid });
+    if (error) return res.status(403).json({ error: error.message });
+    res.json({ id: data.id });
   });
 
-  app.put("/api/update-coupon", (req, res) => {
-    const userId = req.headers['user-id'];
+  app.put("/api/update-coupon", async (req, res) => {
+    const userId = req.headers['user-id'] as string;
     const { id, title, description, status, is_highlighted } = req.body;
-    db.prepare(`
-      UPDATE coupons 
-      SET title = ?, description = ?, status = ?, is_highlighted = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND user_id = ?
-    `).run(title, description, status, is_highlighted ? 1 : 0, id, userId);
+    
+    const { error } = await supabase
+      .from('coupons')
+      .update({ title, description, status, is_highlighted, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) return res.status(400).json({ error: error.message });
     res.json({ success: true });
   });
 
-  app.delete("/api/delete-coupon", (req, res) => {
-    const userId = req.headers['user-id'];
+  app.delete("/api/delete-coupon", async (req, res) => {
+    const userId = req.headers['user-id'] as string;
     const { id } = req.body;
-    db.prepare("DELETE FROM coupons WHERE id = ? AND user_id = ?").run(id, userId);
+    
+    const { error } = await supabase
+      .from('coupons')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) return res.status(400).json({ error: error.message });
     res.json({ success: true });
   });
 
   // --- Clicks & Stats ---
-  app.post("/api/track-click", (req, res) => {
+  app.post("/api/track-click", async (req, res) => {
     const { coupon_id } = req.body;
     const userAgent = req.headers['user-agent'];
     const ip = req.ip;
 
-    db.transaction(() => {
-      db.prepare("INSERT INTO clicks (coupon_id, user_agent, ip_address) VALUES (?, ?, ?)").run(coupon_id, userAgent, ip);
-      db.prepare("UPDATE coupons SET clicks_count = clicks_count + 1 WHERE id = ?").run(coupon_id);
-    })();
+    // The Supabase trigger 'on_click_inserted' handles the increment.
+    const { error } = await supabase
+      .from('clicks')
+      .insert([{ coupon_id, user_agent: userAgent, ip_address: ip }]);
 
+    if (error) return res.status(400).json({ error: error.message });
     res.json({ success: true });
   });
 
-  app.get("/api/stats", (req, res) => {
-    const userId = req.headers['user-id'];
-    const { start_date, end_date } = req.query;
+  app.get("/api/stats", async (req, res) => {
+    const userId = req.headers['user-id'] as string;
 
-    const totalCoupons = db.prepare("SELECT COUNT(*) as count FROM coupons WHERE user_id = ?").get(userId) as any;
-    const totalClicks = db.prepare("SELECT SUM(clicks_count) as count FROM coupons WHERE user_id = ?").get(userId) as any;
-    const activeCoupons = db.prepare("SELECT COUNT(*) as count FROM coupons WHERE user_id = ? AND status = 'active'").get(userId) as any;
-    
-    // Simple click history for chart
-    const clickHistory = db.prepare(`
-      SELECT date(clicked_at) as day, COUNT(*) as count
-      FROM clicks cl
-      JOIN coupons co ON cl.coupon_id = co.id
-      WHERE co.user_id = ?
-      GROUP BY day
-      ORDER BY day DESC
-      LIMIT 7
-    `).all(userId);
+    // Use the view we created
+    const { data: viewData, error: viewError } = await supabase
+      .from('user_dashboard_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (viewError) return res.status(400).json({ error: viewError.message });
+
+    // Get click history
+    const { data: clickHistory, error: historyError } = await supabase
+      .rpc('get_click_history', { p_user_id: userId }); // We might need to add this function to SQL
+
+    // Fallback if RPC not defined yet
+    let history = clickHistory || [];
+    if (historyError) {
+       // Manual query if RPC fails
+       const { data } = await supabase
+        .from('clicks')
+        .select('clicked_at, coupons!inner(user_id)')
+        .eq('coupons.user_id', userId)
+        .order('clicked_at', { ascending: false })
+        .limit(100);
+       
+       // Simple grouping in JS for now
+       const groups: Record<string, number> = {};
+       data?.forEach(c => {
+         const day = new Date(c.clicked_at).toISOString().split('T')[0];
+         groups[day] = (groups[day] || 0) + 1;
+       });
+       history = Object.entries(groups).map(([day, count]) => ({ day, count })).slice(0, 7);
+    }
+
+    // Get latest coupons
+    const { data: latestCoupons } = await supabase
+      .from('coupons')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(5);
 
     res.json({
-      totalCoupons: totalCoupons.count || 0,
-      totalClicks: totalClicks.count || 0,
-      activeCoupons: activeCoupons.count || 0,
-      clickHistory
+      totalCoupons: viewData.total_coupons || 0,
+      totalClicks: viewData.total_clicks || 0,
+      activeCoupons: viewData.active_coupons || 0,
+      clickHistory: history,
+      latestCoupons: latestCoupons || []
     });
   });
-
-  // --- Cron Simulation ---
-  setInterval(() => {
-    const now = new Date().toISOString();
-    // Expire subscriptions
-    db.prepare("UPDATE subscriptions SET status = 'expired' WHERE end_date < ? AND status = 'active'").run(now);
-    // Expire coupons
-    db.prepare("UPDATE coupons SET status = 'expired' WHERE expiration_date < ? AND status = 'active'").run(now);
-  }, 1000 * 60 * 60); // Every hour
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

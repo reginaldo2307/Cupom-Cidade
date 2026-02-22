@@ -588,29 +588,31 @@ const DashboardOverview = ({ onNavigate }: any) => {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {[
-                { title: 'Combo Familiar Pizza', clicks: 142, status: 'Ativo', date: 'Hoje' },
-                { title: 'Desconto 20% Bebidas', clicks: 89, status: 'Ativo', date: 'Ontem' },
-                { title: 'Sobremesa Grátis', clicks: 215, status: 'Pausado', date: '2 dias atrás' },
-              ].map((item, i) => (
-                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="size-8 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
-                        <Tag size={16} />
+              {stats?.latestCoupons?.length > 0 ? (
+                stats.latestCoupons.map((item: any, i: number) => (
+                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="size-8 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                          <Tag size={16} />
+                        </div>
+                        <span className="text-sm font-semibold">{item.title}</span>
                       </div>
-                      <span className="text-sm font-semibold">{item.title}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${item.status === 'Ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{item.clicks} cliques</td>
-                  <td className="px-6 py-4 text-sm text-slate-400 text-right">{item.date}</td>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${item.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{item.clicks_count} cliques</td>
+                    <td className="px-6 py-4 text-sm text-slate-400 text-right">{new Date(item.created_at).toLocaleDateString()}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-slate-400 italic">Nenhum cupom recente.</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -620,13 +622,13 @@ const DashboardOverview = ({ onNavigate }: any) => {
 };
 
 const CouponsPage = ({ onNavigate }: any) => {
-  const [coupons, setCoupons] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
 
   useEffect(() => {
     api.getMyCoupons().then(setCoupons);
   }, []);
 
-  const deleteCoupon = (id: number) => {
+  const deleteCoupon = (id: string) => {
     if (confirm('Tem certeza que deseja excluir este cupom?')) {
       api.deleteCoupon(id).then(() => {
         setCoupons(prev => prev.filter(c => c.id !== id));
@@ -634,7 +636,7 @@ const CouponsPage = ({ onNavigate }: any) => {
     }
   };
 
-  const simulateClick = (id: number) => {
+  const simulateClick = (id: string) => {
     api.trackClick(id).then(() => {
       setCoupons(prev => prev.map(c => c.id === id ? { ...c, clicks_count: c.clicks_count + 1 } : c));
     });

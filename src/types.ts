@@ -1,19 +1,25 @@
-export type Page = 'landing' | 'login' | 'register' | 'dashboard' | 'coupons' | 'create-coupon' | 'billing' | 'settings';
+export type Page = 'landing' | 'login' | 'register' | 'dashboard' | 'coupons' | 'create-coupon' | 'billing' | 'settings' | 'stats';
 
 export interface Coupon {
-  id: number;
+  id: string;
+  user_id: string;
+  category_id: string;
+  category_name?: string;
   title: string;
-  category: string;
   description: string;
-  code: string;
-  expiry_date: string;
-  status: 'active' | 'inactive' | 'scheduled' | 'expired';
-  clicks: number;
+  coupon_code: string;
+  image_url?: string;
+  expiration_date: string;
+  is_highlighted: boolean;
+  status: 'active' | 'expired' | 'paused';
+  clicks_count: number;
+  created_at: string;
 }
 
 export interface Stats {
   totalCoupons: number;
   totalClicks: number;
   activeCoupons: number;
-  plan: string;
+  clickHistory: { day: string; count: number }[];
+  latestCoupons: Coupon[];
 }
