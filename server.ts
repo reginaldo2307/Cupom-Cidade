@@ -9,9 +9,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Supabase client with service role key for administrative tasks
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('CRITICAL: Supabase environment variables are missing!');
+  console.error('SUPABASE_URL:', supabaseUrl ? 'Set' : 'MISSING');
+  console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceKey ? 'Set' : 'MISSING');
+}
+
+let supabase: any;
+try {
+  supabase = createClient(supabaseUrl || '', supabaseServiceKey || '');
+} catch (err: any) {
+  console.error('FAILED to initialize Supabase client:', err.message);
+  // We'll initialize a dummy client or let it be undefined to avoid crashing immediately
+  // but subsequent calls will fail.
+}
 
 async function startServer() {
   const app = express();
@@ -24,27 +38,27 @@ async function startServer() {
     const { email, company_name, responsible_name, phone } = req.body;
     
     try {
-      // In a real Supabase setup, we'd use supabase.auth.signUp
-      // For this demo, we'll use the service role to create a user in auth.users
-      // and let the trigger handle the profile creation, OR just insert into profiles
-      // if we are bypassing real auth for simplicity.
-      
-      // Let's use the 'profiles' table directly for this implementation to match the existing UI
-      // but in a real app, you'd use Supabase Auth.
-      
+      console.log(`Attempting to register user: ${email}`);
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
         email,
-        password: 'password123', // Default password for demo
+        password: 'password123',
         email_confirm: true,
         user_metadata: { company_name, responsible_name }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        console.error('Supabase Auth Error:', authError);
+        throw authError;
+      }
 
-      // The trigger 'on_auth_user_created' in the SQL script handles profile and initial subscription.
-      // We just return the user info.
+      if (!authUser || !authUser.user) {
+        throw new Error('User created but no user data returned');
+      }
+
+      console.log(`User registered successfully: ${authUser.user.id}`);
       res.json({ id: authUser.user.id, email: authUser.user.email });
     } catch (e: any) {
+      console.error('Registration Error:', e);
       res.status(400).json({ error: e.message });
     }
   });

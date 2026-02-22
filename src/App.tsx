@@ -346,8 +346,8 @@ const RegisterPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
     try {
       await api.register(formData);
       onNavigate('dashboard');
-    } catch (err) {
-      alert('Erro ao criar conta.');
+    } catch (err: any) {
+      alert(err.message || 'Erro ao criar conta.');
     } finally {
       setLoading(false);
     }

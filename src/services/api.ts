@@ -25,7 +25,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Registration failed');
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Registration failed');
+    }
     const user = await res.json();
     localStorage.setItem('cidade_cupons_user_id', user.id);
     localStorage.setItem('cidade_cupons_user_email', user.email);
