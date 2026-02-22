@@ -1,0 +1,9 @@
+{
+  "name": "Cidade Cupons",
+  "description": "Plataforma de cupons digitais para comércios locais aumentarem suas vendas e fidelizarem clientes.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
