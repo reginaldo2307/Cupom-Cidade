@@ -252,7 +252,7 @@ const LandingPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
   );
 };
 
-const LoginPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
+const LoginPage = ({ onNavigate, onAuthSuccess }: { onNavigate: (p: Page) => void, onAuthSuccess: (u: any) => void }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -262,8 +262,8 @@ const LoginPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
     setLoading(true);
     setError('');
     try {
-      await api.login(email);
-      onNavigate('dashboard');
+      const userData = await api.login(email);
+      onAuthSuccess(userData);
     } catch (err: any) {
       setError('Usuário não encontrado. Tente novamente.');
     } finally {
@@ -331,7 +331,7 @@ const LoginPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
   );
 };
 
-const RegisterPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
+const RegisterPage = ({ onNavigate, onAuthSuccess }: { onNavigate: (p: Page) => void, onAuthSuccess: (u: any) => void }) => {
   const [formData, setFormData] = useState({
     email: '',
     company_name: '',
@@ -344,8 +344,8 @@ const RegisterPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.register(formData);
-      onNavigate('dashboard');
+      const userData = await api.register(formData);
+      onAuthSuccess(userData);
     } catch (err: any) {
       alert(err.message || 'Erro ao criar conta.');
     } finally {
@@ -432,7 +432,7 @@ const RegisterPage = ({ onNavigate }: { onNavigate: (p: Page) => void }) => {
   );
 };
 
-const DashboardLayout = ({ children, activePage, onNavigate }: any) => {
+const DashboardLayout = ({ children, activePage, onNavigate, user }: any) => {
   return (
     <div className="flex h-screen overflow-hidden">
       <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col hidden lg:flex">
@@ -467,13 +467,13 @@ const DashboardLayout = ({ children, activePage, onNavigate }: any) => {
         <div className="p-4 border-t border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
             <div className="size-9 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-              <img src="https://picsum.photos/seed/user/100/100" alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src={`https://picsum.photos/seed/${user?.id || 'user'}/100/100`} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-semibold truncate">João Silva</p>
-              <p className="text-xs text-slate-500 truncate">Pizzaria da Nonna</p>
+              <p className="text-sm font-semibold truncate">{user?.responsible_name || 'Usuário'}</p>
+              <p className="text-xs text-slate-500 truncate">{user?.company_name || 'Minha Empresa'}</p>
             </div>
-            <button onClick={() => onNavigate('landing')} className="text-slate-400 hover:text-red-500"><LogOut size={16} /></button>
+            <button onClick={() => { api.logout(); onNavigate('landing'); }} className="text-slate-400 hover:text-red-500"><LogOut size={16} /></button>
           </div>
         </div>
       </aside>
@@ -493,7 +493,7 @@ const DashboardLayout = ({ children, activePage, onNavigate }: any) => {
   );
 };
 
-const DashboardOverview = ({ onNavigate }: any) => {
+const DashboardOverview = ({ onNavigate, user }: any) => {
   const [stats, setStats] = useState<any>(null);
   const [sub, setSub] = useState<any>(null);
 
@@ -506,7 +506,7 @@ const DashboardOverview = ({ onNavigate }: any) => {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Visão Geral</h2>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Olá, {user?.responsible_name?.split(' ')[0] || 'Parceiro'}</h2>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Bem-vindo de volta! Gerencie seus cupons com facilidade.</p>
         </div>
         <div className="flex items-center gap-3">
@@ -730,7 +730,12 @@ const CreateCouponPage = ({ onNavigate }: any) => {
     expiration_date: '',
     is_highlighted: false
   });
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api.getCategories().then(setCategories).catch(console.error);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -774,10 +779,9 @@ const CreateCouponPage = ({ onNavigate }: any) => {
                 required
               >
                 <option value="">Selecione uma categoria</option>
-                <option value="food">Alimentação & Bebidas</option>
-                <option value="retail">Varejo & Moda</option>
-                <option value="services">Serviços</option>
-                <option value="beauty">Beleza & Estética</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
               </select>
             </div>
             <div className="col-span-2 space-y-1.5">
@@ -1127,44 +1131,64 @@ const SettingsPage = () => {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('cidade_cupons_user');
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        setCurrentPage('dashboard');
+      } catch (e) {
+        localStorage.removeItem('cidade_cupons_user');
+      }
+    }
+  }, []);
+
+  const handleAuthSuccess = (userData: any) => {
+    setUser(userData);
+    localStorage.setItem('cidade_cupons_user', JSON.stringify(userData));
+    setCurrentPage('dashboard');
+  };
 
   const renderPage = () => {
     switch (currentPage) {
       case 'landing': return <LandingPage onNavigate={setCurrentPage} />;
-      case 'login': return <LoginPage onNavigate={setCurrentPage} />;
-      case 'register': return <RegisterPage onNavigate={setCurrentPage} />;
+      case 'login': return <LoginPage onNavigate={setCurrentPage} onAuthSuccess={handleAuthSuccess} />;
+      case 'register': return <RegisterPage onNavigate={setCurrentPage} onAuthSuccess={handleAuthSuccess} />;
       case 'dashboard': return (
-        <DashboardLayout activePage="dashboard" onNavigate={setCurrentPage}>
-          <DashboardOverview onNavigate={setCurrentPage} />
+        <DashboardLayout activePage="dashboard" onNavigate={setCurrentPage} user={user}>
+          <DashboardOverview onNavigate={setCurrentPage} user={user} />
         </DashboardLayout>
       );
       case 'coupons': return (
-        <DashboardLayout activePage="coupons" onNavigate={setCurrentPage}>
+        <DashboardLayout activePage="coupons" onNavigate={setCurrentPage} user={user}>
           <CouponsPage onNavigate={setCurrentPage} />
         </DashboardLayout>
       );
       case 'create-coupon': return (
-        <DashboardLayout activePage="create-coupon" onNavigate={setCurrentPage}>
+        <DashboardLayout activePage="create-coupon" onNavigate={setCurrentPage} user={user}>
           <CreateCouponPage onNavigate={setCurrentPage} />
         </DashboardLayout>
       );
       case 'stats': return (
-        <DashboardLayout activePage="stats" onNavigate={setCurrentPage}>
+        <DashboardLayout activePage="stats" onNavigate={setCurrentPage} user={user}>
           <StatsPage />
         </DashboardLayout>
       );
       case 'billing': return (
-        <DashboardLayout activePage="billing" onNavigate={setCurrentPage}>
+        <DashboardLayout activePage="billing" onNavigate={setCurrentPage} user={user}>
           <BillingPage />
         </DashboardLayout>
       );
       case 'settings': return (
-        <DashboardLayout activePage="settings" onNavigate={setCurrentPage}>
+        <DashboardLayout activePage="settings" onNavigate={setCurrentPage} user={user}>
           <SettingsPage />
         </DashboardLayout>
       );
       default: return (
-        <DashboardLayout activePage={currentPage} onNavigate={setCurrentPage}>
+        <DashboardLayout activePage={currentPage} onNavigate={setCurrentPage} user={user}>
           <div className="h-full flex items-center justify-center text-slate-500">
             Página em desenvolvimento: {currentPage}
           </div>

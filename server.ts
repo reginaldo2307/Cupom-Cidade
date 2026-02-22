@@ -66,22 +66,44 @@ async function startServer() {
   app.post("/api/login", async (req, res) => {
     const { email } = req.body;
     try {
-      const { data, error } = await supabase
+      if (!supabase) throw new Error('Supabase client not initialized');
+      
+      // Try to find the profile first
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('email', email) // Note: Profiles table needs email if we want to query by it
+        .eq('email', email)
         .single();
 
-      // If profiles doesn't have email, we query auth.users (admin)
-      if (error || !data) {
-        const { data: users, error: userError } = await supabase.auth.admin.listUsers();
-        const user = users.users.find(u => u.email === email);
-        if (user) return res.json({ id: user.id, email: user.email });
-        return res.status(404).json({ error: "User not found" });
+      if (profile) {
+        return res.json(profile);
+      }
+
+      // If not in profiles, check auth.users (maybe trigger failed or it's an old user)
+      const { data: users, error: userError } = await supabase.auth.admin.listUsers();
+      const user = users.users.find(u => u.email === email);
+      
+      if (user) {
+        // If user exists in auth but not in profiles, try to create the profile now
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: user.id,
+            email: user.email,
+            company_name: user.user_metadata?.company_name || 'Minha Empresa',
+            responsible_name: user.user_metadata?.responsible_name || 'Responsável',
+            role: 'company'
+          }])
+          .select()
+          .single();
+        
+        if (createError) throw createError;
+        return res.json(newProfile);
       }
       
-      res.json(data);
+      return res.status(404).json({ error: "Usuário não encontrado." });
     } catch (e: any) {
+      console.error('Login Error:', e);
       res.status(400).json({ error: e.message });
     }
   });
@@ -133,6 +155,22 @@ async function startServer() {
     }
   });
 
+  app.get("/api/categories", async (req, res) => {
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) return res.status(400).json({ error: error.message });
+      res.json(data);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // --- Coupons ---
   app.get("/api/my-coupons", async (req, res) => {
     try {
@@ -176,7 +214,7 @@ async function startServer() {
         .select()
         .single();
 
-      if (error) return res.status(403).json({ error: error.message });
+      if (error) return res.status(400).json({ error: error.message });
       res.json({ id: data.id });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

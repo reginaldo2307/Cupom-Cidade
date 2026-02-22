@@ -1,8 +1,16 @@
-const getUserId = () => localStorage.getItem('cidade_cupons_user_id');
+const getUser = () => {
+  const saved = localStorage.getItem('cidade_cupons_user');
+  if (!saved) return null;
+  try {
+    return JSON.parse(saved);
+  } catch (e) {
+    return null;
+  }
+};
 
 const headers = () => ({
   'Content-Type': 'application/json',
-  'user-id': getUserId() || '',
+  'user-id': getUser()?.id || '',
 });
 
 export const api = {
@@ -12,11 +20,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
-    if (!res.ok) throw new Error('Login failed');
-    const user = await res.json();
-    localStorage.setItem('cidade_cupons_user_id', user.id);
-    localStorage.setItem('cidade_cupons_user_email', user.email);
-    return user;
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Login failed: ${res.status} ${text.slice(0, 50)}`);
+    }
+    return res.json();
   },
 
   async register(data: any) {
@@ -26,13 +34,16 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Registration failed');
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const err = await res.json();
+        throw new Error(err.error || 'Registration failed');
+      } else {
+        const text = await res.text();
+        throw new Error(`Registration failed (${res.status}): ${text.slice(0, 100)}`);
+      }
     }
-    const user = await res.json();
-    localStorage.setItem('cidade_cupons_user_id', user.id);
-    localStorage.setItem('cidade_cupons_user_email', user.email);
-    return user;
+    return res.json();
   },
 
   async getStats() {
@@ -60,8 +71,14 @@ export const api = {
       body: JSON.stringify(data),
     });
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Failed to create coupon');
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create coupon');
+      } else {
+        const text = await res.text();
+        throw new Error(`Failed to create coupon (${res.status}): ${text.slice(0, 100)}`);
+      }
     }
     return res.json();
   },
@@ -84,6 +101,15 @@ export const api = {
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Plans failed: ${res.status} ${text.slice(0, 100)}`);
+    }
+    return res.json();
+  },
+
+  async getCategories() {
+    const res = await fetch('/api/categories');
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Categories failed: ${res.status} ${text.slice(0, 100)}`);
     }
     return res.json();
   },
@@ -111,6 +137,6 @@ export const api = {
   },
 
   logout() {
-    localStorage.removeItem('cidade_cupons_user_id');
+    localStorage.removeItem('cidade_cupons_user');
   }
 };
