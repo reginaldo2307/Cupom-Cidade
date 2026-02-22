@@ -88,177 +88,211 @@ async function startServer() {
 
   // --- Plans & Subscriptions ---
   app.get("/api/plans", async (req, res) => {
-    const { data, error } = await supabase
-      .from('plans')
-      .select('*')
-      .eq('is_active', true);
-    
-    if (error) return res.status(400).json({ error: error.message });
-    res.json(data);
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized. Check your environment variables.');
+      const { data, error } = await supabase
+        .from('plans')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (error) return res.status(400).json({ error: error.message });
+      res.json(data);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.get("/api/my-subscription", async (req, res) => {
-    const userId = req.headers['user-id'] as string;
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .select('*, plans(*)')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .single();
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const userId = req.headers['user-id'] as string;
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*, plans(*)')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
 
-    if (error && error.code !== 'PGRST116') return res.status(400).json({ error: error.message });
-    
-    if (data) {
-      // Flatten the response to match frontend expectations
-      const sub = {
-        ...data,
-        plan_name: data.plans.name,
-        max_coupons: data.plans.max_coupons,
-        max_highlighted_coupons: data.plans.max_highlighted_coupons,
-        has_stats: data.plans.has_stats
-      };
-      res.json(sub);
-    } else {
-      res.json(null);
+      if (error && error.code !== 'PGRST116') return res.status(400).json({ error: error.message });
+      
+      if (data) {
+        // Flatten the response to match frontend expectations
+        const sub = {
+          ...data,
+          plan_name: data.plans.name,
+          max_coupons: data.plans.max_coupons,
+          max_highlighted_coupons: data.plans.max_highlighted_coupons,
+          has_stats: data.plans.has_stats
+        };
+        res.json(sub);
+      } else {
+        res.json(null);
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
   });
 
   // --- Coupons ---
   app.get("/api/my-coupons", async (req, res) => {
-    const userId = req.headers['user-id'] as string;
-    const { data, error } = await supabase
-      .from('coupons')
-      .select('*, categories(name)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const userId = req.headers['user-id'] as string;
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*, categories(name)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-    if (error) return res.status(400).json({ error: error.message });
+      if (error) return res.status(400).json({ error: error.message });
 
-    const formatted = data.map(c => ({
-      ...c,
-      category_name: c.categories?.name
-    }));
-    res.json(formatted);
+      const formatted = data.map(c => ({
+        ...c,
+        category_name: c.categories?.name
+      }));
+      res.json(formatted);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post("/api/create-coupon", async (req, res) => {
-    const userId = req.headers['user-id'] as string;
-    const { title, description, category_id, coupon_code, expiration_date, is_highlighted } = req.body;
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const userId = req.headers['user-id'] as string;
+      const { title, description, category_id, coupon_code, expiration_date, is_highlighted } = req.body;
 
-    // The Supabase trigger 'before_coupon_insert_update' handles the limit validation.
-    // We just try to insert and catch the error.
-    const { data, error } = await supabase
-      .from('coupons')
-      .insert([{
-        user_id: userId,
-        category_id,
-        title,
-        description,
-        coupon_code,
-        expiration_date,
-        is_highlighted
-      }])
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from('coupons')
+        .insert([{
+          user_id: userId,
+          category_id,
+          title,
+          description,
+          coupon_code,
+          expiration_date,
+          is_highlighted
+        }])
+        .select()
+        .single();
 
-    if (error) return res.status(403).json({ error: error.message });
-    res.json({ id: data.id });
+      if (error) return res.status(403).json({ error: error.message });
+      res.json({ id: data.id });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.put("/api/update-coupon", async (req, res) => {
-    const userId = req.headers['user-id'] as string;
-    const { id, title, description, status, is_highlighted } = req.body;
-    
-    const { error } = await supabase
-      .from('coupons')
-      .update({ title, description, status, is_highlighted, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', userId);
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const userId = req.headers['user-id'] as string;
+      const { id, title, description, status, is_highlighted } = req.body;
+      
+      const { error } = await supabase
+        .from('coupons')
+        .update({ title, description, status, is_highlighted, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('user_id', userId);
 
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ success: true });
+      if (error) return res.status(400).json({ error: error.message });
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.delete("/api/delete-coupon", async (req, res) => {
-    const userId = req.headers['user-id'] as string;
-    const { id } = req.body;
-    
-    const { error } = await supabase
-      .from('coupons')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const userId = req.headers['user-id'] as string;
+      const { id } = req.body;
+      
+      const { error } = await supabase
+        .from('coupons')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
 
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ success: true });
+      if (error) return res.status(400).json({ error: error.message });
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // --- Clicks & Stats ---
   app.post("/api/track-click", async (req, res) => {
-    const { coupon_id } = req.body;
-    const userAgent = req.headers['user-agent'];
-    const ip = req.ip;
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const { coupon_id } = req.body;
+      const userAgent = req.headers['user-agent'];
+      const ip = req.ip;
 
-    // The Supabase trigger 'on_click_inserted' handles the increment.
-    const { error } = await supabase
-      .from('clicks')
-      .insert([{ coupon_id, user_agent: userAgent, ip_address: ip }]);
+      const { error } = await supabase
+        .from('clicks')
+        .insert([{ coupon_id, user_agent: userAgent, ip_address: ip }]);
 
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ success: true });
+      if (error) return res.status(400).json({ error: error.message });
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.get("/api/stats", async (req, res) => {
-    const userId = req.headers['user-id'] as string;
+    try {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const userId = req.headers['user-id'] as string;
 
-    // Use the view we created
-    const { data: viewData, error: viewError } = await supabase
-      .from('user_dashboard_stats')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+      // Use the view we created
+      const { data: viewData, error: viewError } = await supabase
+        .from('user_dashboard_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
 
-    if (viewError) return res.status(400).json({ error: viewError.message });
+      if (viewError) return res.status(400).json({ error: viewError.message });
 
-    // Get click history
-    const { data: clickHistory, error: historyError } = await supabase
-      .rpc('get_click_history', { p_user_id: userId }); // We might need to add this function to SQL
+      // Get click history
+      const { data: clickHistory, error: historyError } = await supabase
+        .rpc('get_click_history', { p_user_id: userId });
 
-    // Fallback if RPC not defined yet
-    let history = clickHistory || [];
-    if (historyError) {
-       // Manual query if RPC fails
-       const { data } = await supabase
-        .from('clicks')
-        .select('clicked_at, coupons!inner(user_id)')
-        .eq('coupons.user_id', userId)
-        .order('clicked_at', { ascending: false })
-        .limit(100);
-       
-       // Simple grouping in JS for now
-       const groups: Record<string, number> = {};
-       data?.forEach(c => {
-         const day = new Date(c.clicked_at).toISOString().split('T')[0];
-         groups[day] = (groups[day] || 0) + 1;
-       });
-       history = Object.entries(groups).map(([day, count]) => ({ day, count })).slice(0, 7);
+      // Fallback if RPC not defined yet
+      let history = clickHistory || [];
+      if (historyError) {
+         const { data } = await supabase
+          .from('clicks')
+          .select('clicked_at, coupons!inner(user_id)')
+          .eq('coupons.user_id', userId)
+          .order('clicked_at', { ascending: false })
+          .limit(100);
+         
+         const groups: Record<string, number> = {};
+         data?.forEach(c => {
+           const day = new Date(c.clicked_at).toISOString().split('T')[0];
+           groups[day] = (groups[day] || 0) + 1;
+         });
+         history = Object.entries(groups).map(([day, count]) => ({ day, count })).slice(0, 7);
+      }
+
+      const { data: latestCoupons } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      res.json({
+        totalCoupons: viewData.total_coupons || 0,
+        totalClicks: viewData.total_clicks || 0,
+        activeCoupons: viewData.active_coupons || 0,
+        clickHistory: history,
+        latestCoupons: latestCoupons || []
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
-
-    // Get latest coupons
-    const { data: latestCoupons } = await supabase
-      .from('coupons')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    res.json({
-      totalCoupons: viewData.total_coupons || 0,
-      totalClicks: viewData.total_clicks || 0,
-      activeCoupons: viewData.active_coupons || 0,
-      clickHistory: history,
-      latestCoupons: latestCoupons || []
-    });
   });
 
   // Vite middleware for development

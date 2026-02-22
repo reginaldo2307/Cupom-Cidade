@@ -37,11 +37,19 @@ export const api = {
 
   async getStats() {
     const res = await fetch('/api/stats', { headers: headers() });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Stats failed: ${res.status} ${text.slice(0, 100)}`);
+    }
     return res.json();
   },
 
   async getMyCoupons() {
     const res = await fetch('/api/my-coupons', { headers: headers() });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Coupons failed: ${res.status} ${text.slice(0, 100)}`);
+    }
     return res.json();
   },
 
@@ -64,16 +72,28 @@ export const api = {
       headers: headers(),
       body: JSON.stringify({ id }),
     });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Delete failed: ${res.status} ${text.slice(0, 100)}`);
+    }
     return res.json();
   },
 
   async getPlans() {
     const res = await fetch('/api/plans');
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Plans failed: ${res.status} ${text.slice(0, 100)}`);
+    }
     return res.json();
   },
 
   async getMySubscription() {
     const res = await fetch('/api/my-subscription', { headers: headers() });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Subscription failed: ${res.status} ${text.slice(0, 100)}`);
+    }
     return res.json();
   },
 
@@ -83,6 +103,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ coupon_id: couponId }),
     });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Track click failed: ${res.status} ${text.slice(0, 100)}`);
+    }
     return res.json();
   },
 
