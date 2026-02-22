@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from '@supabase/supabase-js';
+import { MercadoPagoConfig, PreApproval, PreApprovalPlan } from 'mercadopago';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,9 +24,11 @@ try {
   supabase = createClient(supabaseUrl || '', supabaseServiceKey || '');
 } catch (err: any) {
   console.error('FAILED to initialize Supabase client:', err.message);
-  // We'll initialize a dummy client or let it be undefined to avoid crashing immediately
-  // but subsequent calls will fail.
 }
+
+// Initialize Mercado Pago client
+const mpAccessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessToken }) : null;
 
 async function startServer() {
   const app = express();

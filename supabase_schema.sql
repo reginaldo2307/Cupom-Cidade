@@ -56,6 +56,7 @@ CREATE TABLE public.subscriptions (
     end_date TIMESTAMPTZ,
     payment_provider TEXT,
     payment_id TEXT,
+    mercado_pago_subscription_id TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
     -- Constraint: Apenas uma assinatura ativa por usuário
